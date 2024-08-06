@@ -20,6 +20,9 @@ return {
 
     -- Add your own debuggers here
     'leoluz/nvim-dap-go',
+
+    -- python debugger
+    'mfussenegger/nvim-dap-python'
   },
   config = function()
     local dap = require 'dap'
@@ -83,5 +86,15 @@ return {
 
     -- Install golang specific config
     require('dap-go').setup()
+
+    -- Install python specific config
+    require('dap-python').setup('/home/briankariu/.virtualenvs/pynvim/bin/python')
+    table.insert(require('dap').configurations.python, {
+      type = 'python',
+      request = 'launch',
+      name = 'My default launch configuration',
+      program = '${file}',
+      -- ... more options, see https://github.com/microsoft/debugpy/wiki/Debug-configuration-settings
+    })
   end,
 }
