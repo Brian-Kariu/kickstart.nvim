@@ -10,7 +10,7 @@ return {
         dockerfile = { 'hadolint' },
         json = { 'jsonlint' },
         text = { 'vale' },
-        python = { 'python' },
+        python = { 'ruff' },
         javascript = { 'eslint' },
         typescript = { 'eslint' },
       }
