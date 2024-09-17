@@ -13,7 +13,6 @@ return {
   dependencies = {
     -- Creates a beautiful debugger UI
     'rcarriga/nvim-dap-ui',
-
     -- Required dependency for nvim-dap-ui
     'nvim-neotest/nvim-nio',
 
@@ -23,6 +22,7 @@ return {
 
     -- Add your own debuggers here
     'leoluz/nvim-dap-go',
+    'mfussenegger/nvim-dap-python',
   },
   keys = function(_, keys)
     local dap = require 'dap'
@@ -33,6 +33,8 @@ return {
       { '<F1>', dap.step_into, desc = 'Debug: Step Into' },
       { '<F2>', dap.step_over, desc = 'Debug: Step Over' },
       { '<F3>', dap.step_out, desc = 'Debug: Step Out' },
+      { '<F10>', dap.disconnect(), desc = 'Debug: Disconnect' },
+      { '<F11>', dap.terminate, desc = 'Debug: Terminate' },
       { '<leader>b', dap.toggle_breakpoint, desc = 'Debug: Toggle Breakpoint' },
       {
         '<leader>B',
@@ -101,5 +103,9 @@ return {
         detached = vim.fn.has 'win32' == 0,
       },
     }
+
+    require('dap-python').setup '/usr/bin/python3'
+    -- If using the above, then `python -m debugpy --version`
+    -- must work in the shell
   end,
 }

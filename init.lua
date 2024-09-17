@@ -1,4 +1,6 @@
 --[[
+    -- config = function()
+    --   require('presence').setup {
 
 =====================================================================
 ==================== READ THIS BEFORE CONTINUING ====================
@@ -255,7 +257,22 @@ require('lazy').setup({
       },
     },
   },
+  {
+    'NeogitOrg/neogit',
+    dependencies = {
+      'nvim-lua/plenary.nvim', -- required
+      'sindrets/diffview.nvim', -- optional - Diff integration
 
+      'nvim-telescope/telescope.nvim',
+    },
+    config = true,
+  },
+  {
+    'vyfor/cord.nvim',
+    build = './build || .\\build',
+    event = 'VeryLazy',
+    opts = {}, -- calls require('cord').setup()
+  },
   -- NOTE: Plugins can also be configured to run Lua code when they are loaded.
   --
   -- This is often very useful to both group configuration, as well as handle
@@ -578,8 +595,8 @@ require('lazy').setup({
         -- Some languages (like typescript) have entire language plugins that can be useful:
         --    https://github.com/pmizio/typescript-tools.nvim
         --
-        -- But for many setups, the LSP (`tsserver`) will work just fine
-        tsserver = {},
+        -- But for many setups, the LSP (`ts_ls`) will work just fine
+        ts_ls = {},
         --
 
         lua_ls = {
@@ -899,7 +916,7 @@ require('lazy').setup({
   --
   --  Uncomment the following line and add your plugins to `lua/custom/plugins/*.lua` to get going.
   --    For additional information, see `:help lazy.nvim-lazy.nvim-structuring-your-plugins`
-  -- { import = 'custom.plugins' },
+  { import = 'custom.plugins' },
 }, {
   ui = {
     -- If you are using a Nerd Font: set icons to an empty table which will use the
