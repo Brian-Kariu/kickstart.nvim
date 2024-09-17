@@ -634,6 +634,7 @@ require('lazy').setup({
         'golines',
         'prettier',
         'prettierd',
+        'markdownlint-cli2',
       })
       require('mason-tool-installer').setup { ensure_installed = ensure_installed }
 
