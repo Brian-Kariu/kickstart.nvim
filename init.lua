@@ -93,7 +93,7 @@ vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
 -- Set to true if you have a Nerd Font installed and selected in the terminal
-vim.g.have_nerd_font = false
+vim.g.have_nerd_font = true
 
 -- [[ Setting options ]]
 -- See `:help vim.opt`
@@ -269,9 +269,65 @@ require('lazy').setup({
   },
   {
     'vyfor/cord.nvim',
-    build = './build || .\\build',
-    event = 'VeryLazy',
-    opts = {}, -- calls require('cord').setup()
+    build = ':Cord update',
+    opts = function()
+      -- use a custom text for the activity
+      local blacklist = {
+        'blacklisted_workspace',
+        'another_blacklisted_workspace',
+      }
+
+      local is_blacklisted = function(opts)
+        return vim.tbl_contains(blacklist, opts.workspace)
+      end
+
+      return {
+        text = {
+          viewing = function(opts)
+            return 'Viewing a file' or ('Viewing ' .. opts.filename)
+          end,
+          editing = function(opts)
+            return string.format('Editing %s - %s:%s', opts.filename, opts.cursor_line, opts.cursor_char)
+          end,
+          workspace = function(opts)
+            local hour = tonumber(os.date '%H')
+            local status = hour >= 22 and '🌙 Late night coding'
+              or hour >= 18 and '🌆 Evening session'
+              or hour >= 12 and '☀️ Afternoon coding'
+              or hour >= 5 and '🌅 Morning productivity'
+              or '🌙 Midnight hacking'
+
+            return string.format('%s: %s', status, opts.filename)
+          end,
+        },
+
+        buttons = {
+          {
+            label = function(opts)
+              return opts.repo_url and 'View Repository' or 'My Website'
+            end,
+            url = function(opts)
+              return opts.repo_url or 'https://example.com'
+            end,
+          },
+        },
+
+        idle = {
+          details = string.format 'Taking a break from vibe coding',
+        },
+
+        -- or simply hide the activity when in a blacklisted workspace
+        hooks = {
+          workspace_change = function(opts)
+            if is_blacklisted(opts) then
+              opts.manager:hide()
+            else
+              opts.manager:resume()
+            end
+          end,
+        },
+      }
+    end,
   },
   -- NOTE: Plugins can also be configured to run Lua code when they are loaded.
   --
@@ -598,7 +654,13 @@ require('lazy').setup({
         -- But for many setups, the LSP (`ts_ls`) will work just fine
         ts_ls = {},
         --
-
+        -- yaml = {
+        --   schemas = {
+        --     ['https://json.schemastore.org/github-workflow.json'] = '/.github/workflows/*',
+        --     ['../path/relative/to/file.yml'] = '/.github/workflows/*',
+        --     ['/path/from/root/of/project'] = '/.github/workflows/*',
+        --   },
+        -- },
         lua_ls = {
           -- cmd = {...},
           -- filetypes = { ...},
@@ -634,7 +696,13 @@ require('lazy').setup({
         'golines',
         'prettier',
         'prettierd',
+        'hadolint',
+        'jsonlint',
         'markdownlint-cli2',
+        'eslint_d',
+        'vale',
+        'yamlls',
+        'shellcheck',
       })
       require('mason-tool-installer').setup { ensure_installed = ensure_installed }
 
@@ -691,7 +759,93 @@ require('lazy').setup({
       },
     },
   },
+  { -- DBT plugin https://github.com/PedramNavid/dbtpal
+    'PedramNavid/dbtpal',
+    dependencies = {
+      'nvim-lua/plenary.nvim',
+      'nvim-telescope/telescope.nvim',
+    },
+    ft = {
+      'sql',
+      'md',
+      'yaml',
+    },
+    keys = {
+      { '<leader>drf', '<cmd>DbtRun<cr>' },
+      { '<leader>drp', '<cmd>DbtRunAll<cr>' },
+      { '<leader>dtf', '<cmd>DbtTest<cr>' },
+      { '<leader>dm', "<cmd>lua require('dbtpal.telescope').dbt_picker()<cr>" },
+    },
+    config = function()
+      require('dbtpal').setup {
+        path_to_dbt = 'dbt',
+        path_to_dbt_project = '',
+        path_to_dbt_profiles_dir = vim.fn.expand '~/.dbt',
+        extended_path_search = true,
+        protect_compiled_files = true,
+      }
+      require('telescope').load_extension 'dbtpal'
+    end,
+  },
+  {
+    'epwalsh/obsidian.nvim',
+    version = '*', -- recommended, use latest release instead of latest commit
+    lazy = true,
+    ft = 'markdown',
+    -- Replace the above line with this if you only want to load obsidian.nvim for markdown files in your vault:
+    -- event = {
+    --   -- If you want to use the home shortcut '~' here you need to call 'vim.fn.expand'.
+    --   -- E.g. "BufReadPre " .. vim.fn.expand "~" .. "/my-vault/*.md"
+    --   -- refer to `:h file-pattern` for more examples
+    --   "BufReadPre path/to/my-vault/*.md",
+    --   "BufNewFile path/to/my-vault/*.md",
+    -- },
+    dependencies = {
+      -- Required.
+      'nvim-lua/plenary.nvim',
+    },
+    opts = {
+      workspaces = {
+        {
+          name = 'personal',
+          path = '~/obsidian',
+        },
+      },
+    },
+  },
 
+  {
+    'kristijanhusak/vim-dadbod-ui',
+    dependencies = {
+      { 'tpope/vim-dadbod', lazy = true },
+      { 'kristijanhusak/vim-dadbod-completion', ft = { 'sql', 'mysql', 'plsql' }, lazy = true }, -- Optional
+    },
+    cmd = {
+      'DBUI',
+      'DBUIToggle',
+      'DBUIAddConnection',
+      'DBUIFindBuffer',
+    },
+    init = function()
+      -- Your DBUI configuration
+      vim.g.db_ui_save_location = '/media/Files/Files/Workspace/savannah/dev_queries'
+      vim.g.db_ui_use_nerd_fonts = 1
+    end,
+  },
+
+  -- { -- optional saghen/blink.cmp completion source
+  --   'saghen/blink.cmp',
+  --   opts = {
+  --     sources = {
+  --       -- add vim-dadbod-completion to your completion providers
+  --       default = { 'lsp', 'path', 'snippets', 'buffer', 'dadbod' },
+  --       providers = {
+  --         dadbod = { name = 'Dadbod', module = 'vim_dadbod_completion.blink' },
+  --       },
+  --     },
+  --   },
+  -- },
+  --
   { -- Autocompletion
     'hrsh7th/nvim-cmp',
     event = 'InsertEnter',
@@ -712,12 +866,12 @@ require('lazy').setup({
           -- `friendly-snippets` contains a variety of premade snippets.
           --    See the README about individual language/framework/plugin snippets:
           --    https://github.com/rafamadriz/friendly-snippets
-          -- {
-          --   'rafamadriz/friendly-snippets',
-          --   config = function()
-          --     require('luasnip.loaders.from_vscode').lazy_load()
-          --   end,
-          -- },
+          {
+            'rafamadriz/friendly-snippets',
+            config = function()
+              require('luasnip.loaders.from_vscode').lazy_load()
+            end,
+          },
         },
       },
       'saadparwaiz1/cmp_luasnip',
@@ -823,6 +977,12 @@ require('lazy').setup({
       -- You can configure highlights by doing something like:
       vim.cmd.hi 'Comment gui=none'
     end,
+  },
+
+  {
+    'ellisonleao/gruvbox.nvim',
+    priority = 1000,
+    config = true,
   },
 
   -- Highlight todo, notes, etc in comments

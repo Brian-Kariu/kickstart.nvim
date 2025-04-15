@@ -11,8 +11,10 @@ return {
         json = { 'jsonlint' },
         text = { 'vale' },
         python = { 'ruff' },
-        javascript = { 'eslint' },
-        typescript = { 'eslint' },
+        javascript = { 'eslint_d' },
+        typescript = { 'eslint_d' },
+        yaml = { 'yamllint' },
+        bash = { 'shellcheck' },
       }
 
       -- To allow other plugins to add linters to require('lint').linters_by_ft,
