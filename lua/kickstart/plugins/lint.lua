@@ -11,8 +11,11 @@ return {
         json = { 'jsonlint' },
         text = { 'vale' },
         python = { 'ruff' },
-        javascript = { 'eslint_d' },
-        typescript = { 'eslint_d' },
+        golang = { 'golangci-lint' },
+        javascript = { 'biomejs' },
+        typescript = { 'biomejs' },
+        javascriptreact = { 'biomejs' },
+        typescriptreact = { 'biomejs' },
         yaml = { 'yamllint' },
         bash = { 'shellcheck' },
       }

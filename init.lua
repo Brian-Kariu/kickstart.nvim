@@ -165,6 +165,16 @@ vim.opt.scrolloff = 10
 -- Clear highlights on search when pressing <Esc> in normal mode
 --  See `:help hlsearch`
 vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>')
+vim.keymap.set('n', '<leader>tc', function()
+  if vim.bo.filetype == 'python' then
+    require('dap-python').test_class()
+  end
+end, { desc = 'Test current class' })
+vim.keymap.set('n', '<leader>tm', function()
+  if vim.bo.filetype == 'python' then
+    require('dap-python').test_method()
+  end
+end, { desc = 'Test current method' })
 
 -- Diagnostic keymaps
 vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostic [Q]uickfix list' })
@@ -266,6 +276,17 @@ require('lazy').setup({
       'nvim-telescope/telescope.nvim',
     },
     config = true,
+  },
+  {
+    'luckasRanarison/tailwind-tools.nvim',
+    name = 'tailwind-tools',
+    build = ':UpdateRemotePlugins',
+    dependencies = {
+      'nvim-treesitter/nvim-treesitter',
+      'nvim-telescope/telescope.nvim', -- optional
+      'neovim/nvim-lspconfig', -- optional
+    },
+    opts = {}, -- your configuration
   },
   {
     'vyfor/cord.nvim',
@@ -392,7 +413,7 @@ require('lazy').setup({
       { 'nvim-telescope/telescope-ui-select.nvim' },
 
       -- Useful for getting pretty icons, but requires a Nerd Font.
-      { 'nvim-tree/nvim-web-devicons', enabled = vim.g.have_nerd_font },
+      { 'nvim-tree/nvim-web-devicons' },
     },
     config = function()
       -- Telescope is a fuzzy finder that comes with a lot of different things that
@@ -613,11 +634,26 @@ require('lazy').setup({
             })
           end
 
-          -- The following code creates a keymap to toggle inlay hints in your
-          -- code, if the language server you are using supports them
+          -- This function resolves a difference between neovim nightly (version 0.11) and stable (version 0.10)
+          ---@param client vim.lsp.Client
+          ---@param method vim.lsp.protocol.Method
+          ---@param bufnr? integer some lsp support methods only in specific files
+          ---@return boolean
+          local function client_supports_method(client, method, bufnr)
+            if vim.fn.has 'nvim-0.11' == 1 then
+              return client:supports_method(method, bufnr)
+            else
+              return client.supports_method(method, { bufnr = bufnr })
+            end
+          end
+
+          -- The following two autocommands are used to highlight references of the
+          -- word under your cursor when your cursor rests there for a little while.
+          --    See `:help CursorHold` for information about when this is executed
           --
-          -- This may be unwanted, since they displace some of your code
-          if client and client.supports_method(vim.lsp.protocol.Methods.textDocument_inlayHint) then
+          -- When you move your cursor, the highlights will be cleared (the second autocommand).
+          local client = vim.lsp.get_client_by_id(event.data.client_id)
+          if client and client_supports_method(client, vim.lsp.protocol.Methods.textDocument_documentHighlight, event.buf) then
             map('<leader>th', function()
               vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled { bufnr = event.buf })
             end, '[T]oggle Inlay [H]ints')
@@ -644,7 +680,15 @@ require('lazy').setup({
       local servers = {
         -- clangd = {},
         gopls = {},
-        ruff = {},
+        ruff = {
+          settings = {
+            enable = true,
+            log_level = 'debug',
+            ignoreStandardLibrary = true,
+            organizeImports = true,
+            fixAll = true,
+          },
+        },
         -- rust_analyzer = {},
         -- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
         --
@@ -652,7 +696,44 @@ require('lazy').setup({
         --    https://github.com/pmizio/typescript-tools.nvim
         --
         -- But for many setups, the LSP (`ts_ls`) will work just fine
-        ts_ls = {},
+        ts_ls = {
+          -- Use capabilities to disable features
+          capabilities = {
+            typescript = {
+              preferences = {
+                organizeImports = false,
+              },
+              format = {
+                enable = false,
+              },
+            },
+            javascript = {
+              format = {
+                enable = false,
+              },
+            },
+          },
+        },
+        biome = {},
+        pyright = {
+          -- capabilities = require('cmp_nvim_lsp').default_capabilities(),
+          pyright = {
+            disableOrganizeImports = true,
+          },
+          settings = {
+            python = {
+              analysis = {
+                autoSearchPaths = true,
+                diagnosticMode = 'off',
+                typeCheckingMode = 'off',
+                diagnosticSeverityOverrides = {
+                  reportUnusedVariable = 'warning',
+                },
+                useLibraryCodeForTypes = true,
+              },
+            },
+          },
+        },
         --
         -- yaml = {
         --   schemas = {
@@ -694,7 +775,10 @@ require('lazy').setup({
         'gofumpt',
         'goimports-reviser',
         'golines',
+        'golangci-lint',
         'prettier',
+        'typescript-language-server',
+        'biome',
         'prettierd',
         'hadolint',
         'jsonlint',
@@ -749,14 +833,35 @@ require('lazy').setup({
       end,
       formatters_by_ft = {
         lua = { 'stylua' },
-        -- Conform can also run multiple formatters sequentially
-        -- python = { "isort", "black" },
         python = { 'ruff_format', 'ruff_fix', 'ruff_organize_imports' },
         go = { 'gofumpt', 'goimports-reviser' },
         --
         -- You can use 'stop_after_first' to run the first available formatter from the list
-        javascript = { 'prettierd', 'prettier', stop_after_first = true },
+        javascript = { 'biome' },
+        javascriptreact = { 'biome' },
+        typescript = { 'biome' },
+        typescriptreact = { 'biome' },
+        json = { 'biome' },
+        jsonc = { 'biome' },
       },
+    },
+  },
+  {
+    'linux-cultist/venv-selector.nvim',
+    dependencies = {
+      'neovim/nvim-lspconfig',
+      'mfussenegger/nvim-dap',
+      'mfussenegger/nvim-dap-python', --optional
+      { 'nvim-telescope/telescope.nvim', branch = '0.1.x', dependencies = { 'nvim-lua/plenary.nvim' } },
+    },
+    lazy = false,
+    branch = 'regexp', -- This is the regexp branch, use this for the new version
+    keys = {
+      { ',v', '<cmd>VenvSelect<cr>' },
+    },
+    ---@type venv-selector.Config
+    opts = {
+      notify_user_on_venv_activation = false,
     },
   },
   { -- DBT plugin https://github.com/PedramNavid/dbtpal
@@ -868,11 +973,38 @@ require('lazy').setup({
           --    https://github.com/rafamadriz/friendly-snippets
           {
             'rafamadriz/friendly-snippets',
+            'benfowler/telescope-luasnip.nvim',
             config = function()
               require('luasnip.loaders.from_vscode').lazy_load()
             end,
           },
         },
+        config = function(_, opts)
+          if opts then
+            require('luasnip').config.setup(opts)
+          end
+          vim.tbl_map(function(type)
+            require('luasnip.loaders.from_' .. type).lazy_load()
+          end, { 'vscode', 'snipmate', 'lua' })
+          require('luasnip').filetype_extend('python', { 'pydoc' })
+          require('luasnip').filetype_extend('python', { 'django' })
+          require('luasnip').filetype_extend('python', { 'django_rest' })
+          require('luasnip').filetype_extend('python', { 'djangohtml' })
+          require('luasnip').filetype_extend('typescript', { 'angular' })
+          require('luasnip').filetype_extend('typescript', { 'javascript' })
+          require('luasnip').filetype_extend('typescript', { 'tsdoc' })
+          require('luasnip').filetype_extend('javascript', { 'jsdoc' })
+          require('luasnip').filetype_extend('lua', { 'luadoc' })
+          require('luasnip').filetype_extend('rust', { 'rustdoc' })
+          require('luasnip').filetype_extend('cs', { 'csharpdoc' })
+          require('luasnip').filetype_extend('java', { 'javadoc' })
+          require('luasnip').filetype_extend('c', { 'cdoc' })
+          require('luasnip').filetype_extend('cpp', { 'cppdoc' })
+          require('luasnip').filetype_extend('php', { 'phpdoc' })
+          require('luasnip').filetype_extend('kotlin', { 'kdoc' })
+          require('luasnip').filetype_extend('ruby', { 'rdoc' })
+          require('luasnip').filetype_extend('sh', { 'shelldoc' })
+        end,
       },
       'saadparwaiz1/cmp_luasnip',
 
@@ -1029,7 +1161,7 @@ require('lazy').setup({
     'nvim-treesitter/nvim-treesitter',
     build = ':TSUpdate',
     opts = {
-      ensure_installed = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc' },
+      ensure_installed = { 'bash', 'c', 'diff', 'html', 'css', 'tsx', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc' },
       -- Autoinstall languages that are not installed
       auto_install = true,
       highlight = {
