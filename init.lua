@@ -216,6 +216,7 @@ vim.api.nvim_create_autocmd('TextYankPost', {
   end,
 })
 
+local toggle_key = '<C-,>'
 -- [[ Install `lazy.nvim` plugin manager ]]
 --    See `:help lazy.nvim.txt` or https://github.com/folke/lazy.nvim for more info
 local lazypath = vim.fn.stdpath 'data' .. '/lazy/lazy.nvim'
@@ -495,6 +496,77 @@ require('lazy').setup({
       end, { desc = '[S]earch [N]eovim files' })
     end,
   },
+  {
+    'coder/claudecode.nvim',
+    dependencies = { 'folke/snacks.nvim' },
+    config = true,
+    opts = {
+      log_level = 'info', -- "trace", "debug", "info", "warn", "error"
+      terminal_cmd = '~/.local/bin/claude',
+      terminal = {
+        snacks_win_opts = {
+          position = 'float',
+          width = 0.6,
+          height = 0.6,
+          border = 'double',
+          backdrop = 80,
+          keys = {
+            claude_hide = {
+              '<Esc>',
+              function(self)
+                self:hide()
+              end,
+              mode = 't',
+              desc = 'Hide',
+            },
+            claude_hide = {
+              '<C-,>',
+              function(self)
+                self:hide()
+              end,
+              mode = 't',
+              desc = 'Hide (Ctrl+,)',
+            },
+            claude_hide_alt = {
+              '<M-,>',
+              function(self)
+                self:hide()
+              end,
+              mode = 't',
+              desc = 'Hide (Alt+,)',
+            },
+            claude_hide_esc = {
+              '<C-\\><C-n>',
+              function(self)
+                self:hide()
+              end,
+              mode = 't',
+              desc = 'Hide (Ctrl+\\)',
+            },
+          },
+        },
+      },
+    },
+    keys = {
+      { '<leader>a', nil, desc = 'AI/Claude Code' },
+      { '<leader>ac', '<cmd>ClaudeCode<cr>', desc = 'Toggle Claude' },
+      { '<leader>af', '<cmd>ClaudeCodeFocus<cr>', desc = 'Focus Claude' },
+      { '<leader>ar', '<cmd>ClaudeCode --resume<cr>', desc = 'Resume Claude' },
+      { '<leader>aC', '<cmd>ClaudeCode --continue<cr>', desc = 'Continue Claude' },
+      { '<leader>am', '<cmd>ClaudeCodeSelectModel<cr>', desc = 'Select Claude model' },
+      { '<leader>ab', '<cmd>ClaudeCodeAdd %<cr>', desc = 'Add current buffer' },
+      { '<leader>as', '<cmd>ClaudeCodeSend<cr>', mode = 'v', desc = 'Send to Claude' },
+      {
+        '<leader>as',
+        '<cmd>ClaudeCodeTreeAdd<cr>',
+        desc = 'Add file',
+        ft = { 'NvimTree', 'neo-tree', 'oil', 'minifiles', 'netrw' },
+      },
+      -- Diff management
+      { '<leader>aa', '<cmd>ClaudeCodeDiffAccept<cr>', desc = 'Accept diff' },
+      { '<leader>ad', '<cmd>ClaudeCodeDiffDeny<cr>', desc = 'Deny diff' },
+    },
+  },
 
   -- LSP Plugins
   {
@@ -696,25 +768,44 @@ require('lazy').setup({
         --    https://github.com/pmizio/typescript-tools.nvim
         --
         -- But for many setups, the LSP (`ts_ls`) will work just fine
-        ts_ls = {
-          -- Use capabilities to disable features
-          capabilities = {
-            typescript = {
-              preferences = {
-                organizeImports = false,
-              },
-              format = {
-                enable = false,
-              },
-            },
-            javascript = {
-              format = {
-                enable = false,
-              },
+
+        -- ts_ls = {
+        --   javascript = {
+        --     format = {
+        --       enable = false,
+        --     },
+        --   },
+        --   typescript = {
+        --     format = {
+        --       enable = false,
+        --     },
+        --   },
+        --
+        --   -- Use capabilities to disable features
+        --   capabilities = {
+        --     typescript = {
+        --       preferences = {
+        --         organizeImports = false,
+        --       },
+        --       format = {
+        --         enable = false,
+        --       },
+        --     },
+        --     javascript = {
+        --       format = {
+        --         enable = false,
+        --       },
+        --     },
+        --   },
+        -- },
+        biome = {
+          enable = true,
+          lsp = {
+            trace = {
+              server = 'verbose',
             },
           },
         },
-        biome = {},
         pyright = {
           -- capabilities = require('cmp_nvim_lsp').default_capabilities(),
           pyright = {
@@ -776,14 +867,16 @@ require('lazy').setup({
         'goimports-reviser',
         'golines',
         'golangci-lint',
-        'prettier',
-        'typescript-language-server',
+        -- 'prettier',
+        -- 'typescript-language-server',
+        'astro-language-server',
         'biome',
-        'prettierd',
+        'dockerls',
+        -- 'prettierd',
         'hadolint',
         'jsonlint',
         'markdownlint-cli2',
-        'eslint_d',
+        -- 'eslint_d',
         'vale',
         'yamlls',
         'shellcheck',
@@ -798,7 +891,9 @@ require('lazy').setup({
             -- by the server configuration above. Useful when disabling
             -- certain features of an LSP (for example, turning off formatting for tsserver)
             server.capabilities = vim.tbl_deep_extend('force', {}, capabilities, server.capabilities or {})
-            require('lspconfig')[server_name].setup(server)
+            vim.lsp.config(server_name, server)
+            vim.lsp.enable(server_name)
+            -- require('lspconfig')[server_name].setup(server)
           end,
         },
       }
@@ -850,18 +945,15 @@ require('lazy').setup({
     'linux-cultist/venv-selector.nvim',
     dependencies = {
       'neovim/nvim-lspconfig',
-      'mfussenegger/nvim-dap',
-      'mfussenegger/nvim-dap-python', --optional
-      { 'nvim-telescope/telescope.nvim', branch = '0.1.x', dependencies = { 'nvim-lua/plenary.nvim' } },
+      { 'nvim-telescope/telescope.nvim', branch = '0.1.x', dependencies = { 'nvim-lua/plenary.nvim' } }, -- optional: you can also use fzf-lua, snacks, mini-pick instead.
     },
-    lazy = false,
-    branch = 'regexp', -- This is the regexp branch, use this for the new version
+    ft = 'python', -- Load when opening Python files
     keys = {
-      { ',v', '<cmd>VenvSelect<cr>' },
+      { ',v', '<cmd>VenvSelect<cr>' }, -- Open picker on keymap
     },
-    ---@type venv-selector.Config
-    opts = {
-      notify_user_on_venv_activation = false,
+    opts = { -- this can be an empty lua table - just showing below for clarity.
+      search = {}, -- if you add your own searches, they go here.
+      options = {}, -- if you add plugin options, they go here.
     },
   },
   { -- DBT plugin https://github.com/PedramNavid/dbtpal
@@ -915,6 +1007,54 @@ require('lazy').setup({
           name = 'personal',
           path = '~/obsidian',
         },
+      },
+    },
+  },
+  {
+    'pmizio/typescript-tools.nvim',
+    dependencies = { 'nvim-lua/plenary.nvim', 'neovim/nvim-lspconfig' },
+    opts = {},
+    settings = {
+      -- spawn additional tsserver instance to calculate diagnostics on it
+      separate_diagnostic_server = true,
+      -- "change"|"insert_leave" determine when the client asks the server about diagnostic
+      publish_diagnostic_on = 'insert_leave',
+      -- array of strings("fix_all"|"add_missing_imports"|"remove_unused"|
+      -- "remove_unused_imports"|"organize_imports") -- or string "all"
+      -- to include all supported code actions
+      -- specify commands exposed as code_actions
+      expose_as_code_action = {},
+      -- string|nil - specify a custom path to `tsserver.js` file, if this is nil or file under path
+      -- not exists then standard path resolution strategy is applied
+      tsserver_path = nil,
+      -- specify a list of plugins to load by tsserver, e.g., for support `styled-components`
+      -- (see 💅 `styled-components` support section)
+      tsserver_plugins = {},
+      -- this value is passed to: https://nodejs.org/api/cli.html#--max-old-space-sizesize-in-megabytes
+      -- memory limit in megabytes or "auto"(basically no limit)
+      tsserver_max_memory = 'auto',
+      -- described below
+      tsserver_format_options = {},
+      tsserver_file_preferences = {},
+      -- locale of all tsserver messages, supported locales you can find here:
+      -- https://github.com/microsoft/TypeScript/blob/3c221fc086be52b19801f6e8d82596d04607ede6/src/compiler/utilitiesPublic.ts#L620
+      tsserver_locale = 'en',
+      -- mirror of VSCode's `typescript.suggest.completeFunctionCalls`
+      complete_function_calls = false,
+      include_completions_with_insert_text = true,
+      -- CodeLens
+      -- WARNING: Experimental feature also in VSCode, because it might hit performance of server.
+      -- possible values: ("off"|"all"|"implementations_only"|"references_only")
+      code_lens = 'off',
+      -- by default code lenses are displayed on all referencable values and for some of you it can
+      -- be too much this option reduce count of them by removing member references from lenses
+      disable_member_code_lens = true,
+      -- JSXCloseTag
+      -- WARNING: it is disabled by default (maybe you configuration or distro already uses nvim-ts-autotag,
+      -- that maybe have a conflict if enable this feature. )
+      jsx_close_tag = {
+        enable = false,
+        filetypes = { 'javascriptreact', 'typescriptreact' },
       },
     },
   },
