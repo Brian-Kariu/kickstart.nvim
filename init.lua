@@ -159,6 +159,13 @@ vim.opt.cursorline = true
 -- Minimal number of screen lines to keep above and below the cursor.
 vim.opt.scrolloff = 10
 
+-- Modern Neovim 0.11+ features
+vim.opt.smoothscroll = true -- Smooth scrolling for C-u/C-d
+vim.opt.foldmethod = 'expr' -- Treesitter-based folding
+vim.opt.foldexpr = 'v:lua.vim.treesitter.foldexpr()'
+vim.opt.foldenable = false -- Keep folds open by default
+vim.opt.pumheight = 10 -- Limit completion menu height
+
 -- [[ Basic Keymaps ]]
 --  See `:help vim.keymap.set()`
 
@@ -216,6 +223,28 @@ vim.api.nvim_create_autocmd('TextYankPost', {
   end,
 })
 
+-- Auto-create parent directories when writing file
+vim.api.nvim_create_autocmd('BufWritePre', {
+  desc = 'Auto-create parent directories when saving file',
+  group = vim.api.nvim_create_augroup('auto-create-dir', { clear = true }),
+  callback = function(event)
+    local file = vim.loop.fs_realpath(event.match) or event.match
+    vim.fn.mkdir(vim.fn.fnamemodify(file, ':h'), 'p')
+  end,
+})
+
+-- Restore cursor position on file open
+vim.api.nvim_create_autocmd('BufReadPost', {
+  desc = 'Restore cursor position when opening file',
+  group = vim.api.nvim_create_augroup('restore-cursor', { clear = true }),
+  callback = function()
+    local line = vim.fn.line '\'"'
+    if line > 1 and line <= vim.fn.line '$' then
+      vim.cmd 'normal! g`"'
+    end
+  end,
+})
+
 local toggle_key = '<C-,>'
 -- [[ Install `lazy.nvim` plugin manager ]]
 --    See `:help lazy.nvim.txt` or https://github.com/folke/lazy.nvim for more info
@@ -269,26 +298,41 @@ require('lazy').setup({
     },
   },
   {
-    'NeogitOrg/neogit',
-    dependencies = {
-      'nvim-lua/plenary.nvim', -- required
-      'sindrets/diffview.nvim', -- optional - Diff integration
-
-      'nvim-telescope/telescope.nvim',
+    'kdheepak/lazygit.nvim',
+    cmd = {
+      'LazyGit',
+      'LazyGitConfig',
+      'LazyGitCurrentFile',
+      'LazyGitFilter',
+      'LazyGitFilterCurrentFile',
     },
-    config = true,
-  },
-  {
-    'luckasRanarison/tailwind-tools.nvim',
-    name = 'tailwind-tools',
-    build = ':UpdateRemotePlugins',
     dependencies = {
-      'nvim-treesitter/nvim-treesitter',
-      'nvim-telescope/telescope.nvim', -- optional
-      'neovim/nvim-lspconfig', -- optional
+      'nvim-lua/plenary.nvim',
+      'sindrets/diffview.nvim', -- Optional - enhanced diff viewing
     },
-    opts = {}, -- your configuration
+    keys = {
+      { '<leader>gg', '<cmd>LazyGit<cr>', desc = 'LazyGit' },
+      { '<leader>gf', '<cmd>LazyGitCurrentFile<cr>', desc = 'LazyGit Current File' },
+      { '<leader>gc', '<cmd>LazyGitFilter<cr>', desc = 'LazyGit Commits' },
+    },
   },
+  -- Tailwind Tools: Disabled (not using Tailwind CSS)
+  -- Uncomment if you need Tailwind CSS support
+  -- {
+  --   'luckasRanarison/tailwind-tools.nvim',
+  --   name = 'tailwind-tools',
+  --   build = ':UpdateRemotePlugins',
+  --   dependencies = {
+  --     'nvim-treesitter/nvim-treesitter',
+  --     'nvim-telescope/telescope.nvim', -- optional
+  --     'neovim/nvim-lspconfig', -- optional
+  --   },
+  --   opts = {
+  --     server = {
+  --       override = false, -- Disable automatic LSP server setup to avoid deprecated lspconfig API
+  --     },
+  --   },
+  -- },
   {
     'vyfor/cord.nvim',
     build = ':Cord update',
@@ -380,6 +424,7 @@ require('lazy').setup({
         { '<leader>s', group = '[S]earch' },
         { '<leader>w', group = '[W]orkspace' },
         { '<leader>t', group = '[T]oggle' },
+        { '<leader>g', group = '[G]it' },
         { '<leader>h', group = 'Git [H]unk', mode = { 'n', 'v' } },
       }
     end,
@@ -718,18 +763,6 @@ require('lazy').setup({
               return client.supports_method(method, { bufnr = bufnr })
             end
           end
-
-          -- The following two autocommands are used to highlight references of the
-          -- word under your cursor when your cursor rests there for a little while.
-          --    See `:help CursorHold` for information about when this is executed
-          --
-          -- When you move your cursor, the highlights will be cleared (the second autocommand).
-          local client = vim.lsp.get_client_by_id(event.data.client_id)
-          if client and client_supports_method(client, vim.lsp.protocol.Methods.textDocument_documentHighlight, event.buf) then
-            map('<leader>th', function()
-              vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled { bufnr = event.buf })
-            end, '[T]oggle Inlay [H]ints')
-          end
         end,
       })
 
@@ -751,7 +784,23 @@ require('lazy').setup({
       --        For example, to see the options for `lua_ls`, you could go to: https://luals.github.io/wiki/settings/
       local servers = {
         -- clangd = {},
-        gopls = {},
+        gopls = {
+          settings = {
+            gopls = {
+              staticcheck = true,
+              gofumpt = true,
+              hints = {
+                assignVariableTypes = true,
+                compositeLiteralFields = true,
+                compositeLiteralTypes = true,
+                constantValues = true,
+                functionTypeParameters = true,
+                parameterNames = true,
+                rangeVariableTypes = true,
+              },
+            },
+          },
+        },
         ruff = {
           settings = {
             enable = true,
@@ -845,6 +894,33 @@ require('lazy').setup({
               -- You can toggle below to ignore Lua_LS's noisy `missing-fields` warnings
               -- diagnostics = { disable = { 'missing-fields' } },
               diagnostics = { globals = { 'vim' } },
+            },
+          },
+        },
+        ts_ls = {
+          settings = {
+            typescript = {
+              preferences = {
+                importModuleSpecifierPreference = 'relative',
+              },
+              format = { enable = false }, -- Use biome for formatting
+            },
+          },
+        },
+        jsonls = {
+          settings = {
+            json = {
+              format = { enable = true },
+              schemas = {},
+            },
+          },
+        },
+        yamlls = {
+          settings = {
+            yaml = {
+              format = { enable = true },
+              validate = true,
+              schemaStore = { enable = true },
             },
           },
         },
@@ -949,7 +1025,7 @@ require('lazy').setup({
     },
     ft = 'python', -- Load when opening Python files
     keys = {
-      { ',v', '<cmd>VenvSelect<cr>' }, -- Open picker on keymap
+      { '<leader>v', '<cmd>VenvSelect<cr>', desc = 'Select Python [V]env' },
     },
     opts = { -- this can be an empty lua table - just showing below for clarity.
       search = {}, -- if you add your own searches, they go here.
